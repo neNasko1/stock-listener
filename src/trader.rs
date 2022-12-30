@@ -7,7 +7,7 @@ pub enum StockSignal {
 }
 
 pub trait Trader {
-    fn listens_to() -> Vec<String>;
+    fn listens_to(&self) -> Vec<String>;
     fn init(&mut self) -> ();
     fn new_tick(&mut self, market_info: &runner::MarketInfo) -> Vec<StockSignal>;
     fn day_end() -> ();
@@ -34,7 +34,7 @@ impl CrossoverTrader {
 }
 
 impl Trader for CrossoverTrader {
-    fn listens_to() -> Vec<String> {
+    fn listens_to(&self) -> Vec<String> {
         return vec![String::from("AAPL")];
     }
 

@@ -54,7 +54,7 @@ pub fn prepare_sqlite() -> sqlite::Connection {
     return sqlite_connection;
 }
 
-pub fn prepare_client(config_json: &String, url: String) -> Client {
+pub fn prepare_client(config_json: &str, url: &str) -> Client {
     let file = fs::File::open(config_json)
         .expect("There should be config.json present.");
     let json: serde_json::Value = serde_json::from_reader(file)
@@ -71,9 +71,9 @@ pub fn prepare_client(config_json: &String, url: String) -> Client {
     return Client::new(api_info);
 }
 
-pub async fn run_watcher(config_json: &String, symbols: Vec::<String>) {
+pub async fn run_watcher(config_json: &str, symbols: Vec::<String>) {
     let sqlite_connection = prepare_sqlite();
-    let client = prepare_client(&config_json, String::from("https://paper-api.alpaca.markets"));
+    let client = prepare_client(&config_json, "https://paper-api.alpaca.markets");
 
     let (mut stream, mut subscription) = client.subscribe::<RealtimeData<IEX>>().await.unwrap();
 
@@ -118,6 +118,10 @@ pub fn run_backtest(starting_funds: u64, tested_trader: &mut impl trader::Trader
     let mut last_timestamp = String::from("");
     let mut market_info = MarketInfo::new();
 
+    let mut account = HashMap::new();
+    account.insert(String::from("$"), starting_funds);
+    for listen in tested_trader.listens_to() { account.insert(listen, 0); }
+
     for row in sqlite_connection
         .prepare("SELECT * FROM bars ORDER BY timestamp;")
             .unwrap()
@@ -146,10 +150,16 @@ pub fn run_backtest(starting_funds: u64, tested_trader: &mut impl trader::Trader
                         // TODO: Possible losses
                         // Urget-TODO: Possible cheating by buying more than you can purchase
                         trader::StockSignal::Buy(stock, dol) => {
-                            tested_trader.give_stock(stock, dol / bar.close);
+                            let qty = dol / bar.close;
+                            tested_trader.give_stock(stock.clone(), qty);
+                            account.insert(stock.clone(), account[&stock] + qty);
+                            account.insert(String::from("$"), account["$"] - dol);
                         }
-                        trader::StockSignal::Sell(_stock, qty) => {
-                            tested_trader.give_dollars(bar.close * qty);
+                        trader::StockSignal::Sell(stock, qty) => {
+                            let dol = qty * bar.close;
+                            tested_trader.give_dollars(dol);
+                            account.insert(stock.clone(), account[&stock] - qty);
+                            account.insert(String::from("$"), account["$"] + dol);
                         }
                     }
                 }
