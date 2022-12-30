@@ -47,11 +47,26 @@ pub fn prepare_sqlite(database_dir: &str) -> sqlite::Connection {
             close     INTEGER,
             low       INTEGER,
             high      INTEGER,
+            volume    INTEGER,
             timestamp TEXT
             );
         "
         );
     return sqlite_connection;
+}
+
+macro_rules! unwrap_enum {
+    ($target: expr, $pat: path) => {
+        {
+            if let $pat(a) = $target { // #1
+                a
+            } else {
+                panic!(
+                    "mismatch variant when cast to {}",
+                    stringify!($pat)); // #2
+            }
+        }
+    };
 }
 
 pub fn prepare_client(config_json: &str, is_paper: bool) -> Client {
@@ -64,15 +79,27 @@ pub fn prepare_client(config_json: &str, is_paper: bool) -> Client {
         if is_paper {
             ApiInfo::from_parts(
                 "https://paper-api.alpaca.markets",
-                json.get("PAPER_APCA_API_KEY_ID").expect("config.json should have paper-alpaca key"),
-                json.get("PAPER_APCA_API_SECRET_KEY").expect("config.json should have paper-alpaca secret key")
+                unwrap_enum!(
+                    json.get("PAPER_APCA_API_KEY_ID").expect("config.json should have paper-alpaca key"),
+                    serde_json::Value::String
+                ),
+                unwrap_enum!(
+                    json.get("PAPER_APCA_API_SECRET_KEY").expect("config.json should have paper-alpaca key"),
+                    serde_json::Value::String
+                ),
                 )
                 .unwrap()
         } else {
             ApiInfo::from_parts(
                 "https://api.alpaca.markets",
-                json.get("APCA_API_KEY_ID").expect("config.json should have alpaca key"),
-                json.get("APCA_API_SECRET_KEY").expect("config.json should have alpaca secret key")
+                unwrap_enum!(
+                    json.get("APCA_API_KEY_ID").expect("config.json should have paper-alpaca key"),
+                    serde_json::Value::String
+                ),
+                unwrap_enum!(
+                    json.get("APCA_API_SECRET_KEY").expect("config.json should have paper-alpaca key"),
+                    serde_json::Value::String
+                ),
                 )
                 .unwrap()
         };
@@ -82,7 +109,7 @@ pub fn prepare_client(config_json: &str, is_paper: bool) -> Client {
 
 pub async fn run_watcher(config_json: &str, database_dir: &str, symbols: Vec::<String>) {
     let sqlite_connection = prepare_sqlite(database_dir);
-    let client = prepare_client(&config_json, true);
+    let client = prepare_client(&config_json, false);
 
     let (mut stream, mut subscription) = client.subscribe::<RealtimeData<IEX>>().await.unwrap();
 
@@ -101,7 +128,7 @@ pub async fn run_watcher(config_json: &str, database_dir: &str, symbols: Vec::<S
         match data {
             Data::Bar(bar) => {
                 let query = format!(
-                    "INSERT INTO bars VALUES ({}, {}, {}, {}, {}, {}, {})",
+                    "INSERT INTO bars VALUES (\"{}\", {}, {}, {}, {}, {}, \"{}\")",
                     bar.symbol,
                     bar.open_price .to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
                     bar.close_price.to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
@@ -112,6 +139,7 @@ pub async fn run_watcher(config_json: &str, database_dir: &str, symbols: Vec::<S
                     );
 
                 sqlite_connection.execute(query).unwrap();
+                println!("{:?}", bar);
             }
             _ => { println!("{:?}", data); }
         }
