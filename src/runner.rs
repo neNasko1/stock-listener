@@ -18,10 +18,10 @@ const MONEY_SCALING_FACTOR: u64 = 1000;
 
 #[derive(Clone)]
 pub struct Bar {
-    pub open: u64,
-    pub close: u64,
-    pub high: u64,
-    pub low: u64,
+    pub open:   u64,
+    pub close:  u64,
+    pub high:   u64,
+    pub low:    u64,
     pub volume: u64
 }
 
@@ -46,9 +46,6 @@ pub fn prepare_sqlite() -> sqlite::Connection {
       high      INTEGER,
       timestamp TEXT
     );
-    INSERT INTO bars VALUES (\"AAPL\", 123000, 124000, 122500, 124500, \"12/12/2022 12:15\");
-    INSERT INTO bars VALUES (\"GOOGL\", 123000, 124000, 122500, 124500, \"12/12/2022 12:15\");
-    INSERT INTO bars VALUES (\"AAPL\", 124000, 123000, 122000, 125000, \"12/12/2022 12:16\");
     "
   );
   return sqlite_connection;
@@ -83,10 +80,10 @@ pub async fn run_watcher(symbols: Vec::<String>) {
         let query = format!(
           "INSERT INTO bars VALUES ({}, {}, {}, {}, {}, {}, {})",
           bar.symbol,
-          bar.open_price.to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
+          bar.open_price .to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
           bar.close_price.to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
-          bar.low_price.to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
-          bar.high_price.to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
+          bar.low_price  .to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
+          bar.high_price .to_f64().map(|x| x * MONEY_SCALING_FACTOR as f64).unwrap() as u64,
           bar.volume,
           bar.timestamp.format("%d/%m/%Y %H:%M")
         );
