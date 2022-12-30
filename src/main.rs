@@ -9,11 +9,11 @@ pub mod runner;
 async fn main() {
   let args: Vec<String> = args().collect();
 
-  if args.len() < 2 {
+  if args.len() < 3 {
     panic!("Not enough arguments in cli");
   }
 
-  match args[1].as_str() {
+  match args[2].as_str() {
     "watch" => {
       let symbols = vec![
         String::from("AAPL"),
@@ -23,7 +23,7 @@ async fn main() {
         String::from("META"),
         String::from("GOOGL"),
       ];
-      runner::run_watcher(symbols).await;
+      runner::run_watcher(&args[1], symbols).await;
     }
     "backtest" => {
       let mut trader = trader::CrossoverTrader::new();

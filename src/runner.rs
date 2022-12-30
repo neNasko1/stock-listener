@@ -9,7 +9,10 @@ use apca::ApiInfo;
 use futures::FutureExt as _;
 use futures::StreamExt as _;
 
+use serde_json;
+
 use std::collections::HashMap;
+use std::fs;
 
 use sqlite;
 use super::trader;
@@ -51,14 +54,26 @@ pub fn prepare_sqlite() -> sqlite::Connection {
   return sqlite_connection;
 }
 
-pub fn prepare_client() -> Client {
-  let api_info = ApiInfo::from_env().unwrap();
+pub fn prepare_client(config_json: &String) -> Client {
+  let file = fs::File::open(config_json)
+    .expect("There should be config.json present.");
+  let json: serde_json::Value = serde_json::from_reader(file)
+    .expect("config.json should be a valid json.");
+
+  let api_info =
+    ApiInfo::from_parts(
+      "https://api.alpaca.markets",
+      json.get("APCA_API_KEY_ID").expect("config.json should have alpaca key"),
+      json.get("APCA_API_SECRET_KEY").expect("config.json should have alpaca secret key")
+    )
+    .unwrap();
+
   return Client::new(api_info);
 }
 
-pub async fn run_watcher(symbols: Vec::<String>) {
+pub async fn run_watcher(config_json: &String, symbols: Vec::<String>) {
   let sqlite_connection = prepare_sqlite();
-  let client = prepare_client();
+  let client = prepare_client(&config_json);
 
   let (mut stream, mut subscription) = client.subscribe::<RealtimeData<IEX>>().await.unwrap();
 
