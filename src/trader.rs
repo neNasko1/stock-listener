@@ -82,32 +82,24 @@ impl Trader for CrossoverTrader {
             CrossoverTraderAccount::Currency(dol) => {
                 self.account = CrossoverTraderAccount::Currency(dol + amount);
             }
-            CrossoverTraderAccount::Stock(_qty) => {
-                panic!("");
-            }
+            _ => { panic!(""); }
         }
     }
 
     fn give_stock(&mut self, symbol: String, amount: u64) -> () {
         assert!(symbol == String::from("AAPL"));
         match self.account {
-            CrossoverTraderAccount::Currency(_dol) => {
-                panic!("");
-            }
             CrossoverTraderAccount::Stock(qty) => {
                 self.account = CrossoverTraderAccount::Currency(qty + amount);
             }
+            _ => { panic!(""); }
         }
     }
 
     fn money_sum(&self) -> u64 {
         match self.account {
-            CrossoverTraderAccount::Currency(dol) => {
-                return dol;
-            }
-            CrossoverTraderAccount::Stock(qty) => {
-                return qty * self.prices[self.prices.len() - 1];
-            }
+            CrossoverTraderAccount::Currency(dol) => { return dol; }
+            CrossoverTraderAccount::Stock(qty) => { return qty * self.prices[self.prices.len() - 1]; }
         }
     }
 }
