@@ -54,31 +54,39 @@ pub fn prepare_sqlite() -> sqlite::Connection {
     return sqlite_connection;
 }
 
-pub fn prepare_client(config_json: &str, url: &str) -> Client {
+pub fn prepare_client(config_json: &str, is_paper: bool) -> Client {
     let file = fs::File::open(config_json)
         .expect("There should be config.json present.");
     let json: serde_json::Value = serde_json::from_reader(file)
         .expect("config.json should be a valid json.");
 
     let api_info =
-        ApiInfo::from_parts(
-            url,
-            json.get("APCA_API_KEY_ID").expect("config.json should have alpaca key"),
-            json.get("APCA_API_SECRET_KEY").expect("config.json should have alpaca secret key")
-            )
-        .unwrap();
+        if is_paper {
+            ApiInfo::from_parts(
+                "https://paper-api.alpaca.markets",
+                json.get("PAPER_APCA_API_KEY_ID").expect("config.json should have paper-alpaca key"),
+                json.get("PAPER_APCA_API_SECRET_KEY").expect("config.json should have paper-alpaca secret key")
+                )
+                .unwrap()
+        } else {
+            ApiInfo::from_parts(
+                "https://api.alpaca.markets",
+                json.get("APCA_API_KEY_ID").expect("config.json should have alpaca key"),
+                json.get("APCA_API_SECRET_KEY").expect("config.json should have alpaca secret key")
+                )
+                .unwrap()
+        };
 
     return Client::new(api_info);
 }
 
 pub async fn run_watcher(config_json: &str, symbols: Vec::<String>) {
     let sqlite_connection = prepare_sqlite();
-    let client = prepare_client(&config_json, "https://paper-api.alpaca.markets");
+    let client = prepare_client(&config_json, true);
 
     let (mut stream, mut subscription) = client.subscribe::<RealtimeData<IEX>>().await.unwrap();
 
     let mut data = MarketData::default();
-
     data.set_bars(symbols);
 
     let subscribe = subscription.subscribe(&data).boxed();
@@ -118,8 +126,9 @@ pub fn run_backtest(starting_funds: u64, tested_trader: &mut impl trader::Trader
     let mut last_timestamp = String::from("");
     let mut market_info = MarketInfo::new();
 
+    let dollars_symbol: String = String::from("$");
     let mut account = HashMap::new();
-    account.insert(String::from("$"), starting_funds);
+    account.insert(dollars_symbol.clone(), starting_funds);
     for listen in tested_trader.listens_to() { account.insert(listen, 0); }
 
     for row in sqlite_connection
@@ -152,14 +161,18 @@ pub fn run_backtest(starting_funds: u64, tested_trader: &mut impl trader::Trader
                         trader::StockSignal::Buy(stock, dol) => {
                             let qty = dol / bar.close;
                             tested_trader.give_stock(stock.clone(), qty);
+
+                            assert!(account[&dollars_symbol] >= dol);
                             account.insert(stock.clone(), account[&stock] + qty);
-                            account.insert(String::from("$"), account["$"] - dol);
+                            account.insert(dollars_symbol.clone(), account["$"] - dol);
                         }
                         trader::StockSignal::Sell(stock, qty) => {
                             let dol = qty * bar.close;
                             tested_trader.give_dollars(dol);
+
+                            assert!(account[&stock] >= qty);
                             account.insert(stock.clone(), account[&stock] - qty);
-                            account.insert(String::from("$"), account["$"] + dol);
+                            account.insert(dollars_symbol.clone(), account["$"] + dol);
                         }
                     }
                 }
