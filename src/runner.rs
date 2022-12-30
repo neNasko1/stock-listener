@@ -38,8 +38,8 @@ impl MarketInfo {
     }
 }
 
-pub fn prepare_sqlite() -> sqlite::Connection {
-    let sqlite_connection = sqlite::open("stocks.db").unwrap();
+pub fn prepare_sqlite(database_dir: &str) -> sqlite::Connection {
+    let sqlite_connection = sqlite::open(database_dir).unwrap();
     let _ = sqlite_connection.execute(
         "CREATE TABLE bars (
             symbol    TEXT,
@@ -80,8 +80,8 @@ pub fn prepare_client(config_json: &str, is_paper: bool) -> Client {
     return Client::new(api_info);
 }
 
-pub async fn run_watcher(config_json: &str, symbols: Vec::<String>) {
-    let sqlite_connection = prepare_sqlite();
+pub async fn run_watcher(config_json: &str, database_dir: &str, symbols: Vec::<String>) {
+    let sqlite_connection = prepare_sqlite(database_dir);
     let client = prepare_client(&config_json, true);
 
     let (mut stream, mut subscription) = client.subscribe::<RealtimeData<IEX>>().await.unwrap();
@@ -118,8 +118,8 @@ pub async fn run_watcher(config_json: &str, symbols: Vec::<String>) {
     }
 }
 
-pub fn run_backtest(starting_funds: u64, tested_trader: &mut impl trader::Trader) -> u64 {
-    let sqlite_connection = prepare_sqlite();
+pub fn run_backtest(database_dir: &str, starting_funds: u64, tested_trader: &mut impl trader::Trader) -> u64 {
+    let sqlite_connection = prepare_sqlite(database_dir);
 
     tested_trader.give_dollars(starting_funds);
 
